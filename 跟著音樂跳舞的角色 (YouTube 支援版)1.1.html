@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>跟著音樂跳舞的角色 (修復版)</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: "Microsoft JhengHei", sans-serif;
+            background-color: #222;
+            color: white;
+            text-align: center;
+        }
+
+        /* 控制面板 */
+        .control-panel {
+            background: #333;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            border: 1px solid #555;
+        }
+
+        input {
+            padding: 10px;
+            width: 60%;
+            max-width: 400px;
+            border-radius: 4px;
+            border: none;
+        }
+
+        button {
+            padding: 10px 20px;
+            background: #e94560;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        
+        button:disabled {
+            background: #555;
+            cursor: not-allowed;
+        }
+
+        /* 狀態顯示區 */
+        #system-status {
+            margin: 10px 0;
+            font-size: 14px;
+            color: #ffd700;
+            font-family: monospace;
+        }
+
+        /* 版面配置 */
+        .container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 20px;
+        }
+
+        .video-box {
+            width: 100%;
+            max-width: 480px;
+            aspect-ratio: 16/9;
+            background: black;
+            border: 2px solid #e94560;
+        }
+
+        /* 角色舞台 */
+        .stage {
+            width: 300px;
+            height: 400px;
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: radial-gradient(circle at center, #444 0%, #222 70%);
+            border-radius: 20px;
+            border: 2px solid #555;
+        }
+
+        /* 角色 CSS */
+        .character {
+            width: 100px;
+            height: 100px;
+            background: #e94560;
+            border-radius: 10px;
+            position: relative;
+            transition: transform 0.1s; /* 快速反應 */
+        }
+        
+        .eye {
+            width: 20px;
+            height: 20px;
+            background: white;
+            border-radius: 50%;
+            position: absolute;
+            top: 20px;
+        }
+        .eye.left { left: 20px; }
+        .eye.right { right: 20px; }
+        
+        .mouth {
+            width: 40px;
+            height: 10px;
+            background: white;
+            position: absolute;
+            bottom: 20px;
+            left: 30px;
+            border-radius: 5px;
+        }
+
+        /* 手部 */
+        .hand {
+            width: 30px;
+            height: 30px;
+            background: #ff6b81;
+            border-radius: 50%;
+            position: absolute;
+            top: 40px;
+            transition: transform 0.2s;
+        }
+        .hand.left { left: -40px; }
+        .hand.right { right: -40px; }
+
+        /* 動畫提示 */
+        .hint {
+            font-size: 12px;
+            color: #aaa;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="control-panel">
+        <h2>YouTube 音樂跳舞機 (修復版)</h2>
+        <div id="system-status">系統狀態：正在連接 YouTube API...</div>
+        <br>
+        <input type="text" id="urlInput" value="https://www.youtube.com/watch?v=jfKfPfyJRdk" placeholder="貼上 YouTube 網址">
+        <button id="loadBtn" onclick="loadVideo()" disabled>載入影片</button>
+        <p class="hint">注意：載入後，請務必手動點擊影片的「播放」按鈕！</p>
+    </div>
+
+    <div class="container">
+        <div class="video-box">
+            <div id="player"></div>
+        </div>
+
+        <div class="stage">
+            <div class="character" id="char">
+                <div class="eye left"></div>
+                <div class="eye right"></div>
+                <div class="mouth"></div>
+                <div class="hand left" id="handL"></div>
+                <div class="hand right" id="handR"></div>
+            </div>
+        </div>
+    </div>
+
+<script>
+    // 全域變數
+    var player;
+    var isAPILoaded = false;
+    var danceTimer = null;
+    var statusDiv = document.getElementById('system-status');
+    var loadBtn = document.getElementById('loadBtn');
+    var char = document.getElementById('char');
+    var handL = document.getElementById('handL');
+    var handR = document.getElementById('handR');
+
+    // 1. 強制載入 YouTube API
+    var tag = document.createElement('script');
+    tag.src = "https://www.youtube.com/iframe_api";
+    var firstScriptTag = document.getElementsByTagName('script')[0];
+    firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+
+    // 2. API 準備就緒
+    function onYouTubeIframeAPIReady() {
+        statusDiv.innerText = "系統狀態：API 連線成功！請點擊「載入影片」";
+        statusDiv.style.color = "#00ff00";
+        isAPILoaded = true;
+        loadBtn.disabled = false; // 開啟按鈕
+
+        // 初始化播放器 (先不載入影片，建立物件)
+        player = new YT.Player('player', {
+            height: '100%',
+            width: '100%',
+            videoId: '', // 初始空白
+            events: {
+                'onReady': onPlayerReady,
+                'onStateChange': onPlayerStateChange,
+                'onError': onPlayerError
+            }
+        });
+    }
+
+    function onPlayerReady(event) {
+        // 預設載入一首測試歌曲
+        player.cueVideoById("jfKfPfyJRdk"); 
+        statusDiv.innerText = "系統狀態：播放器就緒。請按影片播放鍵開始！";
+    }
+
+    function onPlayerError(event) {
+        statusDiv.innerText = "錯誤：無法播放此影片 (可能該影片禁止嵌入)";
+        statusDiv.style.color = "red";
+    }
+
+    // 3. 狀態監聽：核心邏輯
+    function onPlayerStateChange(event) {
+        // 1 = 正在播放, 2 = 暫停, 0 = 結束, 3 = 緩衝
+        if (event.data == YT.PlayerState.PLAYING) {
+            statusDiv.innerText = "狀態：偵測到音樂，開始跳舞！";
+            startDancing();
+        } else {
+            statusDiv.innerText = "狀態：音樂暫停/停止";
+            stopDancing();
+        }
+    }
+
+    // 4. 載入按鈕功能
+    function loadVideo() {
+        if (!isAPILoaded) {
+            alert("API 尚未載入完成，請檢查網路連線");
+            return;
+        }
+        var url = document.getElementById('urlInput').value;
+        var vid = extractVideoID(url);
+        
+        if (vid) {
+            statusDiv.innerText = "載入中... 請稍候";
+            // 使用 loadVideoById 會嘗試自動播放，但瀏覽器可能會擋
+            player.loadVideoById(vid);
+        } else {
+            alert("網址格式錯誤，請確認是 YouTube 連結");
+        }
+    }
+
+    // 5. 網址解析正則表達式
+    function extractVideoID(url) {
+        var regExp = /^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?))\??v?=?([^#&?]*).*/;
+        var match = url.match(regExp);
+        return (match && match[7].length == 11) ? match[7] : false;
+    }
+
+    // 6. 舞蹈引擎
+    function startDancing() {
+        if (danceTimer) clearInterval(danceTimer);
+        
+        danceTimer = setInterval(function() {
+            // 隨機縮放 (模擬身體律動)
+            var scaleY = 1 + Math.random() * 0.2;
+            var rotate = (Math.random() * 20) - 10;
+            
+            char.style.transform = `scaleY(${scaleY}) rotate(${rotate}deg)`;
+            
+            // 手部亂動
+            handL.style.transform = `translateY(${Math.random() * -50}px)`;
+            handR.style.transform = `translateY(${Math.random() * -50}px)`;
+            
+        }, 400); // 每 0.4 秒動一次
+    }
+
+    function stopDancing() {
+        if (danceTimer) clearInterval(danceTimer);
+        // 復原
+        char.style.transform = "scaleY(1) rotate(0deg)";
+        handL.style.transform = "translateY(0)";
+        handR.style.transform = "translateY(0)";
+    }
+
+</script>
+</body>
+</html>
